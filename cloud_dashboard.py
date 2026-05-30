@@ -1,0 +1,290 @@
+from flask import Flask, render_template_string
+from cloud_storage import init_db, get_all_cloud_data
+from cloud_analytics import get_cloud_summary, get_daily_curve, get_yearly_curve
+
+app = Flask(__name__)
+init_db()
+
+HTML = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PV Cloud Dashboard</title>
+    <meta http-equiv="refresh" content="10">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #1f2937;
+        }
+
+        header {
+            background: linear-gradient(135deg, #0f766e, #2563eb);
+            color: white;
+            padding: 28px 40px;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 32px;
+        }
+
+        .container {
+            padding: 30px 40px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+            margin-bottom: 30px;
+        }
+
+        .card, .chart-card, .table-card {
+            background: white;
+            border-radius: 16px;
+            padding: 22px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 30px;
+            font-weight: bold;
+        }
+
+        .ok {
+            color: #16a34a;
+        }
+
+        .warn {
+            color: #f59e0b;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        canvas {
+            max-height: 320px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            background: #eef2ff;
+            padding: 12px;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .badge {
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .badge-ok {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .badge-alarm {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        @media (max-width: 1000px) {
+            .cards, .charts {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<header>
+    <h1>PV Cloud Dashboard</h1>
+    <p>Historical PV production and environmental monitoring</p>
+</header>
+
+<div class="container">
+
+    <div class="cards">
+        <div class="card">
+            <div class="card-title">Records</div>
+            <div class="card-value">{{ summary.records }}</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Total DC Power</div>
+            <div class="card-value">{{ summary.total_dc_power }} W</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Total AC Power</div>
+            <div class="card-value ok">{{ summary.total_ac_power }} W</div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Alarm Records</div>
+            <div class="card-value warn">{{ summary.alarm_records }}</div>
+        </div>
+    </div>
+
+    <div class="charts">
+        <div class="chart-card">
+            <h2>Tageskurve der Stromerzeugung</h2>
+            <canvas id="dailyChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+            <h2>Jahreskurve der Stromerzeugung</h2>
+            <canvas id="yearlyChart"></canvas>
+        </div>
+    </div>
+
+    <div class="table-card">
+        <h2>Historical PV Data</h2>
+
+        <table>
+            <tr>
+                <th>ID</th>
+                <th>Timestamp</th>
+                <th>Plant</th>
+                <th>DC Power</th>
+                <th>AC Power</th>
+                <th>Energy</th>
+                <th>Irradiance</th>
+                <th>Status</th>
+                <th>Alarms</th>
+            </tr>
+
+            {% for row in rows %}
+            <tr>
+                <td>{{ row[0] }}</td>
+                <td>{{ row[1] }}</td>
+                <td>{{ row[2] }}</td>
+                <td>{{ row[5] }}</td>
+                <td>{{ row[6] }}</td>
+                <td>{{ row[7] }}</td>
+                <td>{{ row[8] }}</td>
+
+                <td>
+                    {% if row[11] == 1 %}
+                        <span class="badge badge-ok">VALID</span>
+                    {% else %}
+                        <span class="badge badge-alarm">INVALID</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if row[12] == "[]" %}
+                        <span class="badge badge-ok">NO ALARM</span>
+                    {% else %}
+                        <span class="badge badge-alarm">ALARM</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+</div>
+
+<script>
+    const dailyLabels = {{ daily_labels | safe }};
+    const dailyValues = {{ daily_values | safe }};
+
+    new Chart(document.getElementById("dailyChart"), {
+        type: "line",
+        data: {
+            labels: dailyLabels,
+            datasets: [{
+                label: "AC Power [W]",
+                data: dailyValues,
+                borderWidth: 3,
+                tension: 0.35
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: true
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    const yearlyLabels = {{ yearly_labels | safe }};
+    const yearlyValues = {{ yearly_values | safe }};
+
+    new Chart(document.getElementById("yearlyChart"), {
+        type: "bar",
+        data: {
+            labels: yearlyLabels,
+            datasets: [{
+                label: "Energy [kWh]",
+                data: yearlyValues,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
+"""
+
+
+@app.route("/")
+def dashboard():
+    daily_labels, daily_values = get_daily_curve()
+    yearly_labels, yearly_values = get_yearly_curve()
+
+    return render_template_string(
+        HTML,
+        rows=get_all_cloud_data(),
+        summary=get_cloud_summary(),
+        daily_labels=daily_labels,
+        daily_values=daily_values,
+        yearly_labels=yearly_labels,
+        yearly_values=yearly_values
+    )
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5002)
