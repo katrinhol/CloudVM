@@ -1,7 +1,7 @@
 # cloud_dashboard.py
 
 from flask import Flask, render_template_string, jsonify
-from cloud_storage import init_db, get_all_cloud_data
+from cloud_storage import init_db, get_all_cloud_data, get_all_plant_data
 from cloud_analytics import get_cloud_summary, get_daily_curve, get_yearly_curve
 
 app = Flask(__name__)
@@ -413,7 +413,7 @@ def dashboard():
 
     return render_template_string(
         HTML,
-        rows=get_all_cloud_data(),
+        rows=get_all_plant_data(),
         summary=get_cloud_summary(),
         daily_labels=daily_labels,
         daily_values=daily_values,
@@ -429,7 +429,7 @@ def dashboard_data():
 
     return jsonify({
         "summary": get_cloud_summary(),
-        "rows": get_all_cloud_data(),
+        "rows": get_all_plant_data(),
         "daily_labels": daily_labels,
         "daily_values": daily_values,
         "yearly_labels": yearly_labels,

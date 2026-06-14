@@ -69,3 +69,20 @@ def get_all_cloud_data():
 
     conn.close()
     return rows
+
+def get_all_plant_data():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT *
+        FROM pv_cloud_data
+        WHERE plant_id IS NOT NULL
+          AND plant_id != 'None'
+        ORDER BY timestamp DESC
+    """)
+
+    rows = cursor.fetchall()
+
+    conn.close()
+    return rows
