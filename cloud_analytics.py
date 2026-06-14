@@ -18,8 +18,8 @@ def get_cloud_summary():
 
     return {
         "records": len(rows),
-        "total_dc_power": round(total_dc, 2),
-        "total_ac_power": round(total_ac, 2),
+        "total_dc_power": round(total_dc / 1000, 2),
+        "total_ac_power": round(total_ac / 1000, 2),
         "alarm_records": alarm_count
     }
 
@@ -27,19 +27,29 @@ def get_cloud_summary():
 def get_daily_curve():
     rows = get_all_cloud_data()
 
+    # get_all_cloud_data() liefert DESC, für Kurve brauchen wir alt -> neu
+    rows = list(reversed(rows))
+
+    # Ein simulierter Tag hat 288 Werte:
+    # 24 Stunden * 12 Werte pro Stunde = 288
+    points_per_day = 288
+
+    # Nur den letzten simulierten Tag anzeigen
+    rows = rows[-points_per_day:]
+
     labels = []
     values = []
 
-    for row in reversed(rows):
-        timestamp = row[1]
-        ac_power = row[6] or 0
+    for i, row in enumerate(rows):
+        simulated_minutes = i * 5
+        hour = simulated_minutes // 60
+        minute = simulated_minutes % 60
 
-        try:
-            dt = datetime.fromisoformat(timestamp)
-            labels.append(dt.strftime("%H:%M:%S"))
-            values.append(ac_power)
-        except:
-            pass
+        labels.append(f"{hour:02d}:{minute:02d}")
+
+        # AC Power von W in kW
+        ac_power_kw = (row[6] or 0) / 1000
+        values.append(round(ac_power_kw, 2))
 
     return labels, values
 

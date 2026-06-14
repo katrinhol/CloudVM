@@ -1,4 +1,6 @@
-from flask import Flask, render_template_string
+# cloud_dashboard.py
+
+from flask import Flask, render_template_string, jsonify
 from cloud_storage import init_db, get_all_cloud_data
 from cloud_analytics import get_cloud_summary, get_daily_curve, get_yearly_curve
 
@@ -10,7 +12,6 @@ HTML = """
 <html>
 <head>
     <title>PV Cloud Dashboard</title>
-    <meta http-equiv="refresh" content="10">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
@@ -132,22 +133,22 @@ HTML = """
     <div class="cards">
         <div class="card">
             <div class="card-title">Records</div>
-            <div class="card-value">{{ summary.records }}</div>
+            <div class="card-value" id="records">{{ summary.records }}</div>
         </div>
 
         <div class="card">
             <div class="card-title">Total DC Power</div>
-            <div class="card-value">{{ summary.total_dc_power }} W</div>
+            <div class="card-value" id="totalDc">{{ summary.total_dc_power }} W</div>
         </div>
 
         <div class="card">
             <div class="card-title">Total AC Power</div>
-            <div class="card-value ok">{{ summary.total_ac_power }} W</div>
+            <div class="card-value ok" id="totalAc">{{ summary.total_ac_power }} W</div>
         </div>
 
         <div class="card">
             <div class="card-title">Alarm Records</div>
-            <div class="card-value warn">{{ summary.alarm_records }}</div>
+            <div class="card-value warn" id="alarmRecords">{{ summary.alarm_records }}</div>
         </div>
     </div>
 
@@ -167,61 +168,116 @@ HTML = """
         <h2>Historical PV Data</h2>
 
         <table>
-            <tr>
-                <th>ID</th>
-                <th>Timestamp</th>
-                <th>Plant</th>
-                <th>DC Power</th>
-                <th>AC Power</th>
-                <th>Energy</th>
-                <th>Irradiance</th>
-                <th>Status</th>
-                <th>Alarms</th>
-            </tr>
-
-            {% for row in rows %}
-            <tr>
-                <td>{{ row[0] }}</td>
-                <td>{{ row[1] }}</td>
-                <td>{{ row[2] }}</td>
-                <td>{{ row[5] }}</td>
-                <td>{{ row[6] }}</td>
-                <td>{{ row[7] }}</td>
-                <td>{{ row[8] }}</td>
-
-                <td>
-                    {% if row[11] == 1 %}
-                        <span class="badge badge-ok">VALID</span>
-                    {% else %}
-                        <span class="badge badge-alarm">INVALID</span>
-                    {% endif %}
-                </td>
-
-                <td>
-                    {% if row[12] == "[]" %}
-                        <span class="badge badge-ok">NO ALARM</span>
-                    {% else %}
-                        <span class="badge badge-alarm">ALARM</span>
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Timestamp</th>
+                    <th>Plant</th>
+                    <th>DC Power</th>
+                    <th>AC Power</th>
+                    <th>Energy</th>
+                    <th>Irradiance</th>
+                    <th>Status</th>
+                    <th>Alarms</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody">
+                {% for row in rows %}
+                <tr>
+                    <td>{{ row[0] }}</td>
+                    <td>{{ row[1] }}</td>
+                    <td>{{ row[2] }}</td>
+                    <td>{{ row[5] }}</td>
+                    <td>{{ row[6] }}</td>
+                    <td>{{ "%.2f"|format(row[7] or 0) }}</td>
+                    <td>{{ "%.2f"|format(row[8] or 0) }}</td>
+                    <td>
+                        {% if row[11] == 1 %}
+                            <span class="badge badge-ok">VALID</span>
+                        {% else %}
+                            <span class="badge badge-alarm">INVALID</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if row[12] == "[]" %}
+                            <span class="badge badge-ok">NO ALARM</span>
+                        {% else %}
+                            <span class="badge badge-alarm">ALARM</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
         </table>
     </div>
 
 </div>
 
 <script>
-    const dailyLabels = {{ daily_labels | safe }};
-    const dailyValues = {{ daily_values | safe }};
+    let dailyChart;
+    let yearlyChart;
 
-    new Chart(document.getElementById("dailyChart"), {
+    const initialDailyLabels = {{ daily_labels | safe }};
+    const initialDailyValues = {{ daily_values | safe }};
+    const initialYearlyLabels = {{ yearly_labels | safe }};
+    const initialYearlyValues = {{ yearly_values | safe }};
+
+    function hasValues(values) {
+        return Array.isArray(values) && values.some(v => Number(v) > 0);
+    }
+
+    function saveLastValidChartData(data) {
+        if (hasValues(data.daily_values)) {
+            localStorage.setItem("dailyChartData", JSON.stringify({
+                labels: data.daily_labels,
+                values: data.daily_values
+            }));
+        }
+
+        if (hasValues(data.yearly_values)) {
+            localStorage.setItem("yearlyChartData", JSON.stringify({
+                labels: data.yearly_labels,
+                values: data.yearly_values
+            }));
+        }
+    }
+
+    function loadLastValidChartData(key, fallbackLabels, fallbackValues) {
+        const saved = localStorage.getItem(key);
+
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (error) {
+                console.error("Could not load saved chart data:", error);
+            }
+        }
+
+        return {
+            labels: fallbackLabels,
+            values: fallbackValues
+        };
+    }
+
+    const dailyData = loadLastValidChartData(
+        "dailyChartData",
+        initialDailyLabels,
+        initialDailyValues
+    );
+
+    const yearlyData = loadLastValidChartData(
+        "yearlyChartData",
+        initialYearlyLabels,
+        initialYearlyValues
+    );
+
+    dailyChart = new Chart(document.getElementById("dailyChart"), {
         type: "line",
         data: {
-            labels: dailyLabels,
+            labels: dailyData.labels,
             datasets: [{
-                label: "AC Power [W]",
-                data: dailyValues,
+                label: "AC Power [kW]",
+                data: dailyData.values,
                 borderWidth: 3,
                 tension: 0.35
             }]
@@ -234,23 +290,30 @@ HTML = """
                 }
             },
             scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Time [h]"
+                    }
+                },
                 y: {
-                    beginAtZero: true
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: "AC-Power [kW]"
+                    }
                 }
             }
         }
     });
 
-    const yearlyLabels = {{ yearly_labels | safe }};
-    const yearlyValues = {{ yearly_values | safe }};
-
-    new Chart(document.getElementById("yearlyChart"), {
+    yearlyChart = new Chart(document.getElementById("yearlyChart"), {
         type: "bar",
         data: {
-            labels: yearlyLabels,
+            labels: yearlyData.labels,
             datasets: [{
                 label: "Energy [kWh]",
-                data: yearlyValues,
+                data: yearlyData.values,
                 borderWidth: 1
             }]
         },
@@ -263,6 +326,79 @@ HTML = """
             }
         }
     });
+
+    function updateSummary(summary) {
+        document.getElementById("records").textContent = summary.records;
+        document.getElementById("totalDc").textContent = summary.total_dc_power + " kW";
+        document.getElementById("totalAc").textContent = summary.total_ac_power + " kW";
+        document.getElementById("alarmRecords").textContent = summary.alarm_records;
+    }
+
+    function updateHistoryTable(rows) {
+        const tbody = document.getElementById("historyBody");
+        tbody.innerHTML = "";
+
+        rows.forEach(row => {
+            const validBadge = row[11] === 1
+                ? '<span class="badge badge-ok">VALID</span>'
+                : '<span class="badge badge-alarm">INVALID</span>';
+
+            const alarmBadge = row[12] === "[]"
+                ? '<span class="badge badge-ok">NO ALARM</span>'
+                : '<span class="badge badge-alarm">ALARM</span>';
+
+            const tr = document.createElement("tr");
+
+            tr.innerHTML = `
+                <td>${row[0] ?? ""}</td>
+                <td>${row[1] ?? ""}</td>
+                <td>${row[2] ?? ""}</td>
+                <td>${row[5] ?? ""}</td>
+                <td>${row[6] ?? ""}</td>
+                <td>${row[7] ?? ""}</td>
+                <td>${row[8] ?? ""}</td>
+                <td>${validBadge}</td>
+                <td>${alarmBadge}</td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function updateDashboard() {
+        try {
+            const response = await fetch("/dashboard-data");
+
+            if (!response.ok) {
+                throw new Error("Dashboard update failed");
+            }
+
+            const data = await response.json();
+
+            updateSummary(data.summary);
+            updateHistoryTable(data.rows);
+
+            saveLastValidChartData(data);
+
+            if (hasValues(data.daily_values)) {
+                dailyChart.data.labels = data.daily_labels;
+                dailyChart.data.datasets[0].data =
+                data.daily_values;
+                dailyChart.update();
+            }
+
+            if (hasValues(data.yearly_values)) {
+                yearlyChart.data.labels = data.yearly_labels;
+                yearlyChart.data.datasets[0].data = data.yearly_values;
+                yearlyChart.update();
+            }
+
+        } catch (error) {
+            console.error("Dashboard update failed:", error);
+        }
+    }
+
+    setInterval(updateDashboard, 10000);
 </script>
 
 </body>
@@ -284,6 +420,21 @@ def dashboard():
         yearly_labels=yearly_labels,
         yearly_values=yearly_values
     )
+
+
+@app.route("/dashboard-data")
+def dashboard_data():
+    daily_labels, daily_values = get_daily_curve()
+    yearly_labels, yearly_values = get_yearly_curve()
+
+    return jsonify({
+        "summary": get_cloud_summary(),
+        "rows": get_all_cloud_data(),
+        "daily_labels": daily_labels,
+        "daily_values": daily_values,
+        "yearly_labels": yearly_labels,
+        "yearly_values": yearly_values
+    })
 
 
 if __name__ == "__main__":
