@@ -27,29 +27,37 @@ def get_cloud_summary():
 def get_daily_curve():
     rows = get_all_cloud_data()
 
-    # get_all_cloud_data() liefert DESC, für Kurve brauchen wir alt -> neu
-    rows = list(reversed(rows))
+    hourly = {h: 0 for h in range(24)}
+    counts = {h: 0 for h in range(24)}
 
-    # Ein simulierter Tag hat 288 Werte:
-    # 24 Stunden * 12 Werte pro Stunde = 288
-    points_per_day = 288
+    for row in rows:
+        try:
+            timestamp = row[1]
+            plant_id = row[2]
+            ac_power = row[6] or 0
 
-    # Nur den letzten simulierten Tag anzeigen
-    rows = rows[-points_per_day:]
+            # Gesamtwerte ohne Plant ignorieren
+            if plant_id is None or str(plant_id) == "None":
+                continue
 
-    labels = []
+            dt = datetime.fromisoformat(timestamp)
+            hour = dt.hour
+
+            hourly[hour] += ac_power
+            counts[hour] += 1
+
+        except:
+            pass
+
+    labels = [f"{h:02d}:00" for h in range(24)]
+
     values = []
-
-    for i, row in enumerate(rows):
-        simulated_minutes = i * 5
-        hour = simulated_minutes // 60
-        minute = simulated_minutes % 60
-
-        labels.append(f"{hour:02d}:{minute:02d}")
-
-        # AC Power von W in kW
-        ac_power_kw = (row[6] or 0) / 1000
-        values.append(round(ac_power_kw, 2))
+    for h in range(24):
+        if counts[h] > 0:
+            # Durchschnitt pro Stunde in kW
+            values.append(round((hourly[h] / counts[h]) / 1000, 2))
+        else:
+            values.append(0)
 
     return labels, values
 

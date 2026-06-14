@@ -138,12 +138,12 @@ HTML = """
 
         <div class="card">
             <div class="card-title">Total DC Power</div>
-            <div class="card-value" id="totalDc">{{ summary.total_dc_power }} W</div>
+            <div class="card-value" id="totalDc">{{ summary.total_dc_power }} kW</div>
         </div>
 
         <div class="card">
             <div class="card-title">Total AC Power</div>
-            <div class="card-value ok" id="totalAc">{{ summary.total_ac_power }} W</div>
+            <div class="card-value ok" id="totalAc">{{ summary.total_ac_power }} kW</div>
         </div>
 
         <div class="card">
@@ -398,7 +398,8 @@ HTML = """
         }
     }
 
-    setInterval(updateDashboard, 10000);
+    updateDashboard();
+    setInterval(updateDashboard, 5000);
 </script>
 
 </body>
