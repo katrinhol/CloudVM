@@ -154,12 +154,12 @@ HTML = """
 
     <div class="charts">
         <div class="chart-card">
-            <h2>Daily electricity curve</h2>
+            <h2>Daily Energy Production</h2>
             <canvas id="dailyChart"></canvas>
         </div>
 
         <div class="chart-card">
-            <h2>Yearly electricity curve</h2>
+            <h2>Yearly Energy Production</h2>
             <canvas id="yearlyChart"></canvas>
         </div>
     </div>
