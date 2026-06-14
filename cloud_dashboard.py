@@ -185,7 +185,7 @@ HTML = """
                 {% for row in rows %}
                 <tr>
                     <td>{{ row[0] }}</td>
-                    <td>{{ row[1] }}</td>
+                    <td>{{ row[1][:19].replace("T", " ") }}</td>
                     <td>{{ row[2] }}</td>
                     <td>{{ row[5] }}</td>
                     <td>{{ row[6] }}</td>
