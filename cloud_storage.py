@@ -99,7 +99,7 @@ def save_cloud_data(data):
 
     alarms = data.get("alarms", [])
     errors = data.get("errors", [])
-    plant_id = normalize_plant_id(data.get("plant_id"))
+    plant_id = normalize_plant_id(data.get("source"))
 
     row = {
         "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
