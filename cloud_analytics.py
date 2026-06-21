@@ -70,10 +70,17 @@ def _num(row, key, default=0.0):
 
 
 def row_to_dict(row):
+
+    plant = _plant(row) or row[IDX["plant_id"]]
+    msg_type = row[IDX["type"]]
+
+    if msg_type == "summary":
+        plant = f"Summary {plant}"
+
     return {
         "id": row[IDX["id"]],
         "timestamp": row[IDX["timestamp"]],
-        "plant_id": _plant(row) or row[IDX["plant_id"]],
+        "plant_id": plant,
         "source": row[IDX["source"]],
         "type": row[IDX["type"]],
         "dc_power": _num(row, "dc_power", None),
