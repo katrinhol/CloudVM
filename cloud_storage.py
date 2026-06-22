@@ -102,7 +102,7 @@ def save_cloud_data(data):
     plant_id = normalize_plant_id(data.get("source"))
 
     row = {
-        "timestamp": data.get("timestamp", datetime.utcnow().isoformat()),
+        "timestamp": data.get("timestamp", datetime.now().isoformat()),
         "plant_id": plant_id,
         "source": data.get("source"),
         "type": data.get("type", "plant"),
