@@ -75,7 +75,7 @@ def row_to_dict(row):
     msg_type = row[IDX["type"]]
 
     if msg_type == "summary":
-        plant = f"Summary {plant}"
+        plant = f"Summary {row[IDX['source']] or plant}"
 
     return {
         "id": row[IDX["id"]],
@@ -168,12 +168,23 @@ def _energy_curve(rows, bucket_func, labels):
 
 def get_daily_curve_by_plant():
     rows = get_today_plant_data()
-    hours = sorted({parse_dt(r[IDX["timestamp"]]).hour for r in rows if parse_dt(r[IDX["timestamp"]])})
-    if not hours:
-        labels = [f"{h:02d}:00" for h in range(24)]
+
+    def bucket_5min(dt):
+        minute = (dt.minute // 5) * 5
+        return f"{dt.hour:02d}:{minute:02d}"
+
+    times = sorted({
+        bucket_5min(parse_dt(r[IDX["timestamp"]]))
+        for r in rows
+        if parse_dt(r[IDX["timestamp"]])
+    })
+
+    if not times:
+        labels = []
     else:
-        labels = [f"{h:02d}:00" for h in range(min(hours), max(hours) + 1)]
-    return _energy_curve(rows, lambda dt: f"{dt.hour:02d}:00", labels)
+        labels = times
+
+    return _energy_curve(rows, lambda dt: bucket_5min(dt), labels)
 
 
 def get_yearly_curve_by_plant():

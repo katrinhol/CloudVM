@@ -61,7 +61,7 @@ HTML = """
 
     <div class="charts">
         <div class="chart-card"><h2>Daily Energy Curve PV1/PV2</h2><canvas id="dailyChart"></canvas></div>
-        <div class="chart-card"><h2>Yearly Energy Curve PV1/PV2</h2><canvas id="yearlyChart"></canvas></div>
+        <div class="chart-card"><h2>Yearly Energy PV1/PV2</h2><canvas id="yearlyChart"></canvas></div>
     </div>
 
     <div class="table-card">
@@ -132,14 +132,20 @@ function updateSummary(summary) {
     document.getElementById("totalAc").textContent = summary.total_ac_power + " kW";
     document.getElementById("alarmRecords").textContent = summary.alarm_records;
 
+    const plantNames = {
+        "PV1": "PV1 Buenos Aires",
+        "PV2": "PV2 Wien"
+    };
+
     const box = document.getElementById("plantCards");
     box.innerHTML = "";
+
     ["PV1", "PV2"].forEach(plant => {
         const p = summary.plants[plant] || {};
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML = `
-            <div class="card-title">${plant} / ${p.region || plant}</div>
+            <div class="card-title">${plantNames[plant]}</div>
             <div class="plant-grid">
                 <div class="metric"><small>DC</small><strong>${fmt(p.dc_kw, 2, " kW")}</strong></div>
                 <div class="metric"><small>AC</small><strong>${fmt(p.ac_kw, 2, " kW")}</strong></div>
